@@ -68,9 +68,15 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
         },
         parameterSource = 'REQUEST',
         resolveTo = 'schema',
-        resolveFor = 'CONVERSION';
+        resolveFor = 'CONVERSION',
+        options = {
+          indentCharacter: '  ',
+          stackLimit: 10,
+          includeDeprecated: true
+        };
 
-      expect(SchemaUtils.safeSchemaFaker(schema, resolveTo, resolveFor, parameterSource, { components, concreteUtils }))
+      expect(SchemaUtils.safeSchemaFaker(schema, resolveTo, resolveFor, parameterSource, { components, concreteUtils },
+        '', undefined, options))
         .to.equal('<string>');
       done();
     });
@@ -100,13 +106,21 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
         parameterSource = 'REQUEST',
         resolveTo = 'schema',
         resolveFor = 'CONVERSION',
+        options = {
+          indentCharacter: '  ',
+          stackLimit: 10,
+          includeDeprecated: true
+        },
 
         result = SchemaUtils.safeSchemaFaker(
           schema,
           resolveTo,
           resolveFor,
           parameterSource,
-          { components, concreteUtils }
+          { components, concreteUtils },
+          '',
+          undefined,
+          options
         ),
         tooManyLevelsString = result[0].c.value;
 
@@ -146,12 +160,20 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
         parameterSource = 'REQUEST',
         resolveTo = 'schema',
         resolveFor = 'CONVERSION',
+        options = {
+          indentCharacter: '  ',
+          stackLimit: 10,
+          includeDeprecated: true
+        },
         fakedSchema = SchemaUtils.safeSchemaFaker(
           schema,
           resolveTo,
           resolveFor,
           parameterSource,
-          { components, concreteUtils }
+          { components, concreteUtils },
+          '',
+          undefined,
+          options
         );
 
       expect(fakedSchema.value).to.equal('reference #/components/schem2 not found in the OpenAPI spec');
@@ -179,17 +201,19 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
         resolvedSchema = deref.resolveRefs(schema,
           parameterSource,
           { components, concreteUtils },
-          {},
-          resolveFor,
-          resolveTo
+          { resolveFor, resolveTo }
         ),
         schemaCache = {
-          schemaFakerCache: {},
-          schemaResolutionCache: {}
+          schemaFakerCache: {}
         },
-        key = hash('resolveToSchema ' + JSON.stringify(resolvedSchema)),
+        key = hash('resolveToSchema ' + JSON.stringify(resolvedSchema) + ' schemaFormatDEFAULT'),
+        options = {
+          indentCharacter: '  ',
+          stackLimit: 10,
+          includeDeprecated: true
+        },
         fakedSchema = SchemaUtils.safeSchemaFaker(schema, resolveTo, resolveFor, parameterSource,
-          { components, concreteUtils }, 'default', '  ', schemaCache);
+          { components, concreteUtils }, 'default', schemaCache, options);
 
       expect(schemaCache.schemaFakerCache).to.have.property(key);
       expect(schemaCache.schemaFakerCache[key]).to.equal(fakedSchema);
@@ -220,19 +244,21 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
         resolveTo = 'example',
         resolveFor = 'CONVERSION',
         schemaCache = {
-          schemaFakerCache: {},
-          schemaResolutionCache: {}
+          schemaFakerCache: {}
         },
         resolvedSchema = deref.resolveRefs(schema,
           parameterSource,
           { components, concreteUtils },
-          schemaCache.schemaResolutionCache,
-          resolveFor,
-          resolveTo
+          { resolveFor, resolveTo }
         ),
-        key = hash('resolveToExample ' + JSON.stringify(resolvedSchema)),
+        key = hash('resolveToExample ' + JSON.stringify(resolvedSchema) + ' schemaFormatDEFAULT'),
+        options = {
+          indentCharacter: '  ',
+          stackLimit: 10,
+          includeDeprecated: true
+        },
         fakedSchema = SchemaUtils.safeSchemaFaker(schema, resolveTo, resolveFor, parameterSource,
-          { components, concreteUtils }, 'default', '  ', schemaCache);
+          { components, concreteUtils }, 'default', schemaCache, options);
 
       expect(schemaCache.schemaFakerCache).to.have.property(key);
       expect(schemaCache.schemaFakerCache[key]).to.equal(fakedSchema);
@@ -242,6 +268,60 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
       done();
 
     });
+
+    it('should populate schemaFakerCache with distinct value when only the schemaFormat is different', function (done) {
+      var schema = {
+          $ref: '#/components/schema/request'
+        },
+        components = {
+          schema: {
+            request: {
+              properties: {
+                name: {
+                  type: 'string'
+                }
+              }
+            }
+          }
+        },
+        parameterSource = 'REQUEST',
+        resolveTo = 'schema',
+        resolveFor = 'CONVERSION',
+        resolvedSchema = deref.resolveRefs(schema,
+          parameterSource,
+          { components, concreteUtils },
+          { resolveFor, resolveTo }
+        ),
+        schemaCache = {
+          schemaFakerCache: {}
+        },
+        xml_key = hash('resolveToSchema ' + JSON.stringify(resolvedSchema) + ' schemaFormatXML'),
+        default_key = hash('resolveToSchema ' + JSON.stringify(resolvedSchema) + ' schemaFormatDEFAULT'),
+        options = {
+          indentCharacter: '  ',
+          stackLimit: 10,
+          includeDeprecated: true
+        },
+        fakedSchema_default = SchemaUtils.safeSchemaFaker(schema, resolveTo, resolveFor, parameterSource,
+          { components, concreteUtils }, 'default', schemaCache, options),
+        fakedSchema_xml = SchemaUtils.safeSchemaFaker(schema, resolveTo, resolveFor, parameterSource,
+          { components, concreteUtils }, 'xml', schemaCache, options);
+
+      expect(schemaCache.schemaFakerCache).to.have.property(default_key);
+      expect(schemaCache.schemaFakerCache[default_key]).to.equal(fakedSchema_default);
+      expect(fakedSchema_default).to.eql({
+        name: '<string>'
+      });
+
+      expect(schemaCache.schemaFakerCache).to.have.property(xml_key);
+      expect(schemaCache.schemaFakerCache[xml_key]).to.equal(fakedSchema_xml);
+      expect(fakedSchema_xml).to.eql(
+        '<element>\n  <name>(string)</name>\n</element>'
+      );
+
+      done();
+    });
+
   });
 
   describe('convertToPmCollectionVariables function', function() {
@@ -1664,7 +1744,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
                   examples: {
                     xml: {
                       summary: 'A list containing two items',
-                      value: 'text/plain description'
+                      value: '<AnXMLObject>test</AnXMLObject>'
                     }
                   }
                 }
@@ -1675,7 +1755,9 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
             exampleParametersResolution: 'example'
           });
           resultBody = (result.body.raw);
-          expect(resultBody).to.equal('"text/plain description"');
+          expect(resultBody).to.equal(
+            '<?xml version="1.0" encoding="UTF-8"?>\n<AnXMLObject>test</AnXMLObject>'
+          );
           expect(result.contentHeader).to.deep.include(
             { key: 'Content-Type', value: 'text/xml' });
           expect(result.body.options.raw.language).to.equal('xml');
@@ -1697,7 +1779,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
           });
           resultBody = result.body.raw;
           expect(resultBody)
-            .to.equal('"text/plain description"');
+            .to.equal('text/plain description');
           expect(result.contentHeader).to.deep.include(
             { key: 'Content-Type', value: 'text/plain' });
           done();
@@ -1717,7 +1799,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
             exampleParametersResolution: 'example'
           });
           resultBody = (result.body.raw);
-          expect(resultBody).to.equal('"<html><body><ul><li>item 1</li><li>item 2</li></ul></body></html>"');
+          expect(resultBody).to.equal('<html><body><ul><li>item 1</li><li>item 2</li></ul></body></html>');
           expect(result.contentHeader).to.deep.include(
             { key: 'Content-Type', value: 'text/html' });
           done();
@@ -1839,7 +1921,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
                 examples: {
                   xml: {
                     summary: 'A list containing two items',
-                    value: 'text/plain description'
+                    value: '<AnXMLObject>test</AnXMLObject>'
                   }
                 }
               }
@@ -1850,7 +1932,9 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
           requestParametersResolution: 'example'
         });
         resultBody = (result.body.raw);
-        expect(resultBody).to.equal('"text/plain description"');
+        expect(resultBody).to.equal(
+          '<?xml version="1.0" encoding="UTF-8"?>\n<AnXMLObject>test</AnXMLObject>'
+        );
         expect(result.contentHeader).to.deep.include(
           { key: 'Content-Type', value: 'text/xml' });
         expect(result.body.options.raw.language).to.equal('xml');
@@ -1868,7 +1952,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
           result, resultBody;
         result = SchemaUtils.convertToPmBody(requestBody);
         resultBody = result.body.raw;
-        expect(resultBody).to.equal('"text/plain description"');
+        expect(resultBody).to.equal('text/plain description');
         expect(result.contentHeader).to.deep.include(
           { key: 'Content-Type', value: 'text/plain' });
         done();
@@ -1885,7 +1969,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
           result, resultBody;
         result = SchemaUtils.convertToPmBody(requestBody);
         resultBody = (result.body.raw);
-        expect(resultBody).to.equal('"<html><body><ul><li>item 1</li><li>item 2</li></ul></body></html>"');
+        expect(resultBody).to.equal('<html><body><ul><li>item 1</li><li>item 2</li></ul></body></html>');
         expect(result.contentHeader).to.deep.include(
           { key: 'Content-Type', value: 'text/html' });
         done();
@@ -1922,6 +2006,70 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
 
         result = SchemaUtils.convertToPmBody(requestBody);
         expect(result.body.mode).to.equal('file');
+        done();
+      });
+      it(' application/vnd.api+json (headers with different structure but still of JSON type/family)', function(done) {
+        var requestBody = {
+            description: 'body description',
+            content: {
+              'application/vnd.api+json': {
+                'schema': {
+                  type: 'object',
+                  required: [
+                    'id',
+                    'name'
+                  ],
+                  properties: {
+                    id: {
+                      type: 'integer',
+                      format: 'int64'
+                    },
+                    name: {
+                      type: 'string'
+                    },
+                    neglect: { // this will be neglected since schemaFaker does not process
+                      type: 'string',
+                      format: 'binary'
+                    }
+                  }
+                }
+              }
+            }
+          },
+          result, resultBody;
+        result = SchemaUtils.convertToPmBody(requestBody);
+        resultBody = JSON.parse(result.body.raw);
+        expect(resultBody.id).to.equal('<long>');
+        expect(resultBody.name).to.equal('<string>');
+        expect(result.contentHeader).to.deep.include({ key: 'Content-Type', value: 'application/vnd.api+json' });
+        expect(result.body.options.raw.language).to.equal('json');
+        done();
+      });
+      it(' application/vnd.api+xml (headers with different structure but still of XML type/family)', function(done) {
+        var requestBody = {
+            description: 'body description',
+            content: {
+              'application/vnd.api+xml': {
+                examples: {
+                  xml: {
+                    summary: 'A list containing two items',
+                    value: '<AnXMLObject>test</AnXMLObject>'
+                  }
+                }
+              }
+            }
+          },
+          result, resultBody;
+        result = SchemaUtils.convertToPmBody(requestBody, 'ROOT', {}, {
+          requestParametersResolution: 'example'
+        });
+        resultBody = (result.body.raw);
+        expect(resultBody).to.equal(
+          '<?xml version="1.0" encoding="UTF-8"?>\n<AnXMLObject>test</AnXMLObject>'
+        );
+        expect(result.contentHeader).to.deep.include(
+          { key: 'Content-Type', value: 'application/vnd.api+xml' });
+        expect(result.body.options.raw.language).to.equal('xml');
         done();
       });
       // things remaining : application/xml
@@ -2483,6 +2631,13 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
   });
 
   describe('fixPathVariablesInUrl function', function() {
+    it('should be able to handle incorrect urls', function(done) {
+      expect(SchemaUtils.fixPathVariablesInUrl({})).to.equal('');
+      expect(SchemaUtils.fixPathVariablesInUrl(null)).to.equal('');
+      expect(SchemaUtils.fixPathVariablesInUrl(undefined)).to.equal('');
+      done();
+    });
+
     it('should convert a url with scheme and path variables', function(done) {
       var convertedUrl = SchemaUtils.fixPathVariablesInUrl('{scheme}://developer.uspto.gov/{path0}/segment/{path1}');
       expect(convertedUrl).to.equal('{{scheme}}://developer.uspto.gov/{{path0}}/segment/{{path1}}');
@@ -2496,6 +2651,18 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
 
       expect(SchemaUtils.fixPathVariablesInUrl('{protocol}://{host}:{port}/{contextpath}/{restapi}'))
         .to.equal('{{protocol}}://{{host}}:{{port}}/{{contextpath}}/{{restapi}}');
+
+      done();
+    });
+
+    it('should correctly handle non string values', function(done) {
+      expect(SchemaUtils.fixPathVariablesInUrl(123)).to.equal('');
+
+      expect(SchemaUtils.fixPathVariablesInUrl([])).to.equal('');
+
+      expect(SchemaUtils.fixPathVariablesInUrl({})).to.equal('');
+
+      expect(SchemaUtils.fixPathVariablesInUrl(true)).to.equal('');
 
       done();
     });
@@ -2705,7 +2872,7 @@ describe('SCHEMA UTILITY FUNCTION TESTS ', function () {
         explode: true
       };
 
-      SchemaUtils.getParamSerialisationInfo(param, 'REQUEST', {}, {});
+      SchemaUtils.getParamSerialisationInfo(param, 'REQUEST', {});
       expect(param.schema).to.have.property('type', 'array');
       expect(param.schema.items).to.have.property('type', 'string');
       expect(param.schema).to.not.have.property('default');
@@ -2923,5 +3090,239 @@ describe('getPostmanUrlSchemaMatchScore function', function() {
     // only one path var (spaceId) should be identified as others will be stored as collection variable
     expect(endpointMatchScore.pathVars).to.have.lengthOf(1);
     expect(endpointMatchScore.pathVars[0]).to.eql({ key: 'spaceId', value: ':spaceId' });
+  });
+});
+
+describe('findCommonSubpath method', function () {
+  it('should return aabb with input ["aa/bb/cc/dd", "aa/bb"]', function () {
+    const result = Utils.findCommonSubpath(['aa/bb/cc/dd', 'aa/bb']);
+    expect(result).to.equal('aa/bb');
+  });
+
+  it('should return empty string with undefined input', function () {
+    const result = Utils.findCommonSubpath();
+    expect(result).to.equal('');
+  });
+
+  it('should return empty string with empty array input', function () {
+    const result = Utils.findCommonSubpath([]);
+    expect(result).to.equal('');
+  });
+
+  it('should return aabb with input ["aa/bb/cc/dd", "aa/bb", undefined]', function () {
+    const result = Utils.findCommonSubpath(['aa/bb/cc/dd', 'aa/bb', undefined]);
+    expect(result).to.equal('aa/bb');
+  });
+
+  it('should return "" with input ["aabbccdd", "aabb", "ccddee"]', function () {
+    const result = Utils.findCommonSubpath(['aa/bb/cc/dd', 'aa/bb', 'ccddee']);
+    expect(result).to.equal('');
+  });
+
+});
+
+describe('getAuthHelper method - OAuth2 Flows', function() {
+  it('Should parse OAuth2 configuration to collection (Single Flow) - Type 1', function() {
+    const openAPISpec = {
+        'components': {
+          'responses': {},
+          'schemas': {},
+          'securitySchemes': {
+            'oauth2': {
+              'flows': {
+                'clientCredentials': {
+                  'scopes': {},
+                  'tokenUrl': 'https://example.com/oauth2/token'
+                }
+              },
+              'type': 'oauth2'
+            }
+          }
+        },
+        'info': {
+          'title': 'API',
+          'version': '0.2'
+        },
+        'openapi': '3.0.0',
+        'paths': {},
+        'security': [
+          {
+            'oauth2': []
+          }
+        ],
+        'servers': [
+          {
+            'url': 'https://example.com',
+            'variables': {}
+          }
+        ],
+        'tags': [],
+        'securityDefs': {
+          'oauth2': {
+            'flows': {
+              'clientCredentials': {
+                'scopes': {},
+                'tokenUrl': 'https://example.com/oauth2/token'
+              }
+            },
+            'type': 'oauth2'
+          }
+        },
+        'baseUrl': 'https://example.com',
+        'baseUrlVariables': {}
+      },
+      securitySet = [{ oauth2: [] }],
+      helperData = SchemaUtils.getAuthHelper(openAPISpec, securitySet);
+
+    expect(helperData.type).to.be.equal('oauth2');
+    expect(helperData).to.have.property('oauth2').with.lengthOf(2);
+    expect(helperData.oauth2[0]).to.be.an('object');
+    expect(helperData).to.deep.equal({
+      type: 'oauth2',
+      oauth2: [
+        {
+          key: 'accessTokenUrl',
+          value: 'https://example.com/oauth2/token'
+        },
+        { key: 'grant_type', value: 'client_credentials' }
+      ]
+    });
+  });
+
+  it('Should parse OAuth2 configuration to collection (Multiple Flow types)- Type 2', function() {
+    const openAPISpec = {
+        components: {
+          responses: {},
+          schemas: {},
+          securitySchemes: {
+            oauth2: {
+              type: 'oauth2',
+              flows: {
+                implicit: {
+                  authorizationUrl: 'https://example.com/api/oauth/dialog',
+                  scopes: {
+                    'write:pets': 'modify pets in your account',
+                    'read:pets': 'read your pets'
+                  }
+                },
+                authorizationCode: {
+                  authorizationUrl: 'https://example.com/api/oauth/dialog',
+                  tokenUrl: 'https://example.com/api/oauth/token',
+                  scopes: {
+                    'write:pets': 'modify pets in your account',
+                    'read:pets': 'read your pets'
+                  }
+                }
+              }
+            }
+          }
+        },
+        info: { title: 'API', version: '0.2' },
+        openapi: '3.0.0',
+        paths: {},
+        security: [{ oauth2: [] }],
+        servers: [{ url: 'https://myserver.com', variables: {} }],
+        tags: [],
+        securityDefs: {
+          oauth2: {
+            type: 'oauth2',
+            flows: {
+              implicit: {
+                authorizationUrl: 'https://example.com/api/oauth/dialog',
+                scopes: {
+                  'write:pets': 'modify pets in your account',
+                  'read:pets': 'read your pets'
+                }
+              },
+              authorizationCode: {
+                authorizationUrl: 'https://example.com/api/oauth/dialog',
+                tokenUrl: 'https://example.com/api/oauth/token',
+                scopes: {
+                  'write:pets': 'modify pets in your account',
+                  'read:pets': 'read your pets'
+                }
+              }
+            }
+          }
+        },
+        baseUrl: 'https://myserver.com',
+        baseUrlVariables: {}
+      },
+      securitySet = [{ oauth2: [] }],
+      helperData = SchemaUtils.getAuthHelper(openAPISpec, securitySet);
+
+    expect(helperData.type).to.be.equal('oauth2');
+    expect(helperData).to.have.property('oauth2').with.lengthOf(3);
+    expect(helperData.oauth2[0]).to.be.an('object');
+    expect(helperData).to.deep.equal({
+      'type': 'oauth2',
+      'oauth2': [
+        {
+          'key': 'scope',
+          'value': 'write:pets read:pets'
+        },
+        {
+          'key': 'authUrl',
+          'value': 'https://example.com/api/oauth/dialog'
+        },
+        {
+          'key': 'grant_type',
+          'value': 'implicit'
+        }
+      ]
+    });
+  });
+
+  it('Scopes are parsed as sequence of strings', function() {
+    const openAPISpec = {
+        components: {
+          responses: {},
+          schemas: {},
+          securitySchemes: {
+            oauth2: {
+              type: 'oauth2',
+              flows: {
+                implicit: {
+                  authorizationUrl: 'https://example.com/api/oauth/dialog',
+                  scopes: {
+                    'write:pets': 'modify pets in your account',
+                    'read:pets': 'read your pets'
+                  }
+                }
+              }
+            }
+          }
+        },
+        info: { title: 'API', version: '0.2' },
+        openapi: '3.0.0',
+        paths: {},
+        security: [{ oauth2: [] }],
+        servers: [{ url: 'https://myserver.com', variables: {} }],
+        tags: [],
+        securityDefs: {
+          oauth2: {
+            type: 'oauth2',
+            flows: {
+              implicit: {
+                authorizationUrl: 'https://example.com/api/oauth/dialog',
+                scopes: {
+                  'write:pets': 'modify pets in your account',
+                  'read:pets': 'read your pets'
+                }
+              }
+            }
+          }
+        },
+        baseUrl: 'https://myserver.com',
+        baseUrlVariables: {}
+      },
+      securitySet = [{ oauth2: [] }],
+      helperData = SchemaUtils.getAuthHelper(openAPISpec, securitySet);
+
+    expect(helperData.type).to.be.equal('oauth2');
+    expect(helperData).to.have.property('oauth2').with.lengthOf(3);
+    expect(helperData.oauth2[0]).to.be.an('object');
+    expect(helperData.oauth2[0].key).to.be.equal('scope');
+    expect(helperData.oauth2[0].value).to.be.equal('write:pets read:pets');
   });
 });

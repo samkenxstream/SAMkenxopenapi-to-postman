@@ -5,7 +5,11 @@ var expect = require('chai').expect,
   _ = require('lodash'),
   async = require('async'),
   VALID_OPENAPI_PATH = '../data/valid_openapi',
-  INVALID_OPENAPI_PATH = '../data/invalid_openapi';
+  INVALID_OPENAPI_PATH = '../data/invalid_openapi',
+  SWAGGER_20_FOLDER_YAML = '../data/valid_swagger/yaml/',
+  SWAGGER_20_FOLDER_JSON = '../data/valid_swagger/json/',
+  VALID_OPENAPI_3_1_FOLDER_JSON = '../data/valid_openapi31X/json',
+  VALID_OPENAPI_3_1_FOLDER_YAML = '../data/valid_openapi31X/yaml';
 
 describe('CONVERT FUNCTION TESTS ', function() {
   // these two covers remaining part of util.js
@@ -48,7 +52,43 @@ describe('CONVERT FUNCTION TESTS ', function() {
       issue10229 = path.join(__dirname, VALID_OPENAPI_PATH, '/issue#10229.json'),
       deepObjectLengthProperty = path.join(__dirname, VALID_OPENAPI_PATH, '/deepObjectLengthProperty.yaml'),
       valuePropInExample = path.join(__dirname, VALID_OPENAPI_PATH, '/valuePropInExample.yaml'),
-      petstoreParamExample = path.join(__dirname, VALID_OPENAPI_PATH, '/petstoreParamExample.yaml');
+      petstoreParamExample = path.join(__dirname, VALID_OPENAPI_PATH, '/petstoreParamExample.yaml'),
+      xmlrequestBody = path.join(__dirname, VALID_OPENAPI_PATH, '/xmlExample.yaml'),
+      queryParamWithEnumResolveAsExample =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/query_param_with_enum_resolve_as_example.json'),
+      formDataParamDescription = path.join(__dirname, VALID_OPENAPI_PATH, '/form_data_param_description.yaml'),
+      allHTTPMethodsSpec = path.join(__dirname, VALID_OPENAPI_PATH, '/all-http-methods.yaml'),
+      invalidNullInfo = path.join(__dirname, INVALID_OPENAPI_PATH, '/invalid-null-info.json'),
+      invalidNullInfoTitle = path.join(__dirname, INVALID_OPENAPI_PATH, '/invalid-info-null-title.json'),
+      invalidNullInfoVersion = path.join(__dirname, INVALID_OPENAPI_PATH, '/invalid-info-null-version.json'),
+      onlyOneOperationDeprecated = path.join(__dirname, VALID_OPENAPI_PATH, '/has_one_op_dep.json'),
+      someOperationOneDeprecated = path.join(__dirname, VALID_OPENAPI_PATH, '/has_some_op_dep.json'),
+      someOperationDeprecatedUsingTags =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/has_some_op_dep_use_tags.json'),
+      deprecatedParams =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/petstore_deprecated_param.json'),
+      deprecatedProperty =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/deprecated_property.json'),
+      schemaParamDeprecated =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/parameter_schema_dep_property.json'),
+      specWithAuthBearer = path.join(__dirname, VALID_OPENAPI_PATH + '/specWithAuthBearer.yaml'),
+      specWithAuthApiKey = path.join(__dirname, VALID_OPENAPI_PATH + '/specWithAuthApiKey.yaml'),
+      specWithAuthDigest = path.join(__dirname, VALID_OPENAPI_PATH + '/specWithAuthDigest.yaml'),
+      specWithAuthOauth1 = path.join(__dirname, VALID_OPENAPI_PATH + '/specWithAuthOauth1.yaml'),
+      specWithAuthBasic = path.join(__dirname, VALID_OPENAPI_PATH + '/specWithAuthBasic.yaml'),
+      schemaWithArrayTypeAndAdditionalProperties =
+        path.join(__dirname, VALID_OPENAPI_PATH + '/schemaWithArrayTypeAndAdditionalProperties.yaml'),
+      xmlRequestAndResponseBody = path.join(__dirname, VALID_OPENAPI_PATH, '/xmlRequestAndResponseBody.json'),
+      xmlRequestAndResponseBodyNoPrefix =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/xmlRequestAndResponseBodyNoPrefix.json'),
+      xmlRequestAndResponseBodyArrayType =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/xmlRequestAndResponseBodyArrayType.json'),
+      xmlRequestAndResponseBodyArrayTypeNoPrefix =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/xmlRequestAndResponseBodyArrayTypeNoPrefix.json'),
+      xmlRequestAndResponseBodyArrayTypeWrapped =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/xmlRequestAndResponseBodyArrayTypeWrapped.json'),
+      schemaWithAdditionalProperties =
+        path.join(__dirname, VALID_OPENAPI_PATH, '/schemaWithAdditionalProperties.yaml');
 
 
     it('Should add collection level auth with type as `bearer`' +
@@ -1042,7 +1082,7 @@ describe('CONVERT FUNCTION TESTS ', function() {
     });
 
     it('[Github #31] & [GitHub #337] - should set optional params as disabled', function(done) {
-      let options = { schemaFaker: true, disableOptionalParameters: true };
+      let options = { schemaFaker: true, enableOptionalParameters: false };
       Converter.convert({ type: 'file', data: requiredInParams }, options, (err, conversionResult) => {
         expect(err).to.be.null;
         let requests = conversionResult.output[0].data.item[0].item,
@@ -1139,6 +1179,789 @@ describe('CONVERT FUNCTION TESTS ', function() {
           done();
         });
     });
+
+    it('Should convert xml request body correctly', function(done) {
+      const openapi = fs.readFileSync(xmlrequestBody, 'utf8');
+      Converter.convert({ type: 'string', data: openapi },
+        { schemaFaker: true }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output[0].data.item[0].request.body.raw)
+            .to.equal(
+              '<?xml version="1.0" encoding="UTF-8"?>\n' +
+              '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope">' +
+              ' <soap:Body> <NumberToWords ' +
+              'xmlns="http://www.dataaccess.com/webservicesserver"> ' +
+              '<ubiNum>500</ubiNum> </NumberToWords> </soap:Body> ' +
+              '</soap:Envelope>'
+            );
+          done();
+        });
+    });
+
+    it('[Github #518]- integer query params with enum values get default value of NaN' +
+    descriptionInBodyParams, function(done) {
+      var openapi = fs.readFileSync(queryParamWithEnumResolveAsExample, 'utf8');
+      Converter.convert({
+        type: 'string',
+        data: openapi
+      }, {
+        schemaFaker: true,
+        requestParametersResolution: 'Example'
+      }, (err, conversionResult) => {
+        let fakedParam = conversionResult.output[0].data.item[0].request.url.query[0].value;
+        expect(err).to.be.null;
+        expect(fakedParam).to.be.equal('120');
+        done();
+      });
+    });
+
+    it('[Github #559]Should convert description in form data parameters' +
+    petstoreParamExample, function(done) {
+      var openapi = fs.readFileSync(formDataParamDescription, 'utf8');
+      Converter.convert({ type: 'string', data: openapi },
+        { }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output[0].data.item[0].request.body.formdata[0].description)
+            .to.equal('Request param description');
+          expect(conversionResult.output[0].data.item[0].request.body.formdata[0].key).to.equal('requestParam');
+          expect(conversionResult.output[0].data.item[0].request.body.formdata[0].value).to.equal('<string>');
+          done();
+        });
+    });
+
+    it('Should have disableBodyPruning option for protocolProfileBehavior set to true for all types of request' +
+      allHTTPMethodsSpec, function (done) {
+      var openapi = fs.readFileSync(allHTTPMethodsSpec, 'utf8');
+
+      Converter.convert({ type: 'string', data: openapi },
+        {}, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+
+          _.forEach(conversionResult.output[0].data.item[0].item, (request) => {
+            expect(request.protocolProfileBehavior.disableBodyPruning).to.eql(true);
+          });
+          done();
+        });
+    });
+
+    it('[GITHUB #597] - should convert file with all of merging properties', function() {
+      const fileSource = path.join(__dirname, VALID_OPENAPI_PATH, 'all_of_properties.json'),
+        fileData = fs.readFileSync(fileSource, 'utf8'),
+        input = {
+          type: 'string',
+          data: fileData
+        };
+
+      Converter.convert(input, { optimizeConversion: false, stackLimit: 50 }, (err, result) => {
+        let responseBody = JSON.parse(result.output[0].data.item[0].response[0].body);
+        expect(err).to.be.null;
+        expect(result.result).to.be.true;
+        expect(responseBody)
+          .to.have.all.keys('grandParentTypeData', 'specificType');
+        expect(responseBody.specificType)
+          .to.have.all.keys(
+            'grandParentTypeData',
+            'parentTypeData',
+            'specificTypeData'
+          );
+      });
+    });
+
+    it('The converter must throw an error for invalid null info', function (done) {
+      var openapi = fs.readFileSync(invalidNullInfo, 'utf8');
+      Converter.convert({ type: 'string', data: openapi },
+        {}, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(false);
+          expect(conversionResult.reason)
+            .to.equal('Specification must contain an Info Object for the meta-data of the API');
+          done();
+        });
+    });
+
+    it('The converter must throw an error for invalid null info title', function (done) {
+      var openapi = fs.readFileSync(invalidNullInfoTitle, 'utf8');
+      Converter.convert({ type: 'string', data: openapi },
+        {}, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(false);
+          expect(conversionResult.reason)
+            .to.equal('Specification must contain a title in order to generate a collection');
+          done();
+        });
+    });
+
+    it('The converter must throw an error for invalid null info version', function (done) {
+      var openapi = fs.readFileSync(invalidNullInfoVersion, 'utf8');
+      Converter.convert({ type: 'string', data: openapi },
+        {}, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(false);
+          expect(conversionResult.reason)
+            .to.equal('Specification must contain a semantic version number of the API in the Info Object');
+          done();
+        });
+    });
+
+    it('Should generate collection where folder name doesn\'t contain spaces when ' +
+      'not present in operation path', function (done) {
+      var openapi = fs.readFileSync(testSpec, 'utf8');
+      Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+        expect(err).to.be.null;
+        expect(conversionResult.result).to.equal(true);
+        expect(conversionResult.output.length).to.equal(1);
+        expect(conversionResult.output[0].type).to.equal('collection');
+        expect(conversionResult.output[0].data).to.have.property('info');
+        expect(conversionResult.output[0].data).to.have.property('item');
+        expect(conversionResult.output[0].data.item.length).to.equal(2);
+        expect(_.map(conversionResult.output[0].data.item, 'name')).to.include.members(['pets', 'pet/{petId}']);
+        done();
+      });
+    });
+
+    it('Should convert and include deprecated operations when option is not present' +
+    '- has only one op and is deprecated', function () {
+      const fileData = fs.readFileSync(onlyOneOperationDeprecated, 'utf8');
+      Converter.convert({ type: 'string', data: fileData }, undefined,
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.result).to.be.true;
+          expect(result.output[0].data.item.length).to.equal(1);
+        });
+    });
+
+    it('Should convert and exclude deprecated operations - has only one op and is deprecated', function () {
+      const fileData = fs.readFileSync(onlyOneOperationDeprecated, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.result).to.be.true;
+          expect(result.output[0].data.item).to.be.empty;
+        });
+    });
+
+    it('Should convert and exclude deprecated operations -- has some deprecated', function () {
+      const fileData = fs.readFileSync(someOperationOneDeprecated, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.result).to.be.true;
+          expect(result.output[0].data.item.length).to.equal(1);
+        });
+    });
+
+    it('Should convert and exclude deprecated operations - has only one op and is deprecated' +
+      'using tags as folder strategy operation has not tag', function () {
+      const fileData = fs.readFileSync(onlyOneOperationDeprecated, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false, folderStrategy: 'tags' },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.result).to.be.true;
+          expect(result.output[0].data.item).to.be.empty;
+        });
+    });
+
+    it('Should convert and exclude deprecated operations - has some deprecated' +
+      'using tags as folder strategy', function () {
+      const fileData = fs.readFileSync(someOperationDeprecatedUsingTags, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false, folderStrategy: 'tags' },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.result).to.be.true;
+          expect(result.output[0].data.item.length).to.equal(1);
+          expect(result.output[0].data.item[0].name).to.equal('pets');
+        });
+    });
+
+    it('Should convert and exclude deprecated params when option is set to false', function() {
+      const fileData = fs.readFileSync(deprecatedParams, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].item[0].request.url.query.length).to.equal(1);
+          expect(result.output[0].data.item[0].item[0].request.url.query[0].key).to.equal('variable');
+          expect(result.output[0].data.item[0].item[0].request.header.length).to.equal(3);
+          expect(result.output[0].data.item[0].item[0].request.header[0].key).to.equal('limit');
+          expect(result.output[0].data.item[0].item[0].request.header[1].key).to.equal('limit_2');
+          expect(result.output[0].data.item[0].item[1].request.header[0].key).to.equal('limit_2');
+        });
+    });
+
+    it('Should convert and include deprecated params when option is set to true', function() {
+      const fileData = fs.readFileSync(deprecatedParams, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: true },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].item[0].request.url.query.length).to.equal(2);
+          expect(result.output[0].data.item[0].item[0].request.url.query[0].key).to.equal('variable');
+          expect(result.output[0].data.item[0].item[0].request.url.query[1].key).to.equal('variable2');
+          expect(result.output[0].data.item[0].item[0].request.header.length).to.equal(4);
+          expect(result.output[0].data.item[0].item[0].request.header[0].key).to.equal('limit');
+          expect(result.output[0].data.item[0].item[0].request.header[1].key).to.equal('limit_2');
+          expect(result.output[0].data.item[0].item[0].request.header[2].key).to.equal('limit_Dep');
+        });
+    });
+
+    it('Should convert and include deprecated params when option is not present', function() {
+      const fileData = fs.readFileSync(deprecatedParams, 'utf8');
+      Converter.convert({ type: 'string', data: fileData }, {},
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].item[0].request.url.query.length).to.equal(2);
+          expect(result.output[0].data.item[0].item[0].request.url.query[0].key).to.equal('variable');
+          expect(result.output[0].data.item[0].item[0].request.url.query[1].key).to.equal('variable2');
+          expect(result.output[0].data.item[0].item[0].request.header.length).to.equal(4);
+          expect(result.output[0].data.item[0].item[0].request.header[0].key).to.equal('limit');
+          expect(result.output[0].data.item[0].item[0].request.header[1].key).to.equal('limit_2');
+          expect(result.output[0].data.item[0].item[0].request.header[2].key).to.equal('limit_Dep');
+        });
+    });
+
+    it('Should convert and exclude deprecated property when option is set to false', function() {
+      const fileData = fs.readFileSync(deprecatedProperty, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].request.body.raw)
+            .to.equal('{\n  "b": "<string>"\n}');
+          expect(result.output[0].data.item[0].response[1].body.includes('errorCode')).to.be.false;
+        });
+    });
+
+    it('Should convert and include deprecated property when option is set to true', function() {
+      const fileData = fs.readFileSync(deprecatedProperty, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: true },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].request.body.raw)
+            .to.equal('{\n  "a": "<string>",\n  "b": "<string>"\n}');
+          expect(result.output[0].data.item[0].response[1].body.includes('errorCode')).to.be.true;
+        });
+    });
+
+    it('Should convert and include deprecated property when option is set to true in query and path', function() {
+      const fileData = fs.readFileSync(schemaParamDeprecated, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: true },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].request.url.query[0].key)
+            .to.equal('deprecated');
+          expect(result.output[0].data.item[0].request.url.query[1].key)
+            .to.equal('b');
+          expect(result.output[0].data.item[0].request.url.query[1].value)
+            .to.equal('{"c":"<string>","d":"<string>","deprecated":"<string>"}');
+          expect(result.output[0].data.item[0].request.url.variable[0].value)
+            .to.equal(';limitPath=deprecated,<boolean>,b,<string>');
+          expect(result.output[0].data.item[0].request.header[0].value)
+            .to.equal('deprecated,<boolean>,b,<string>');
+        });
+    });
+
+    it('Should convert and include deprecated property when option is set to false in query and path', function() {
+      const fileData = fs.readFileSync(schemaParamDeprecated, 'utf8');
+      Converter.convert({ type: 'string', data: fileData },
+        { includeDeprecated: false },
+        (err, result) => {
+          expect(err).to.be.null;
+          expect(result.output[0].data.item[0].request.url.query[0].key)
+            .to.equal('deprecated');
+          expect(result.output[0].data.item[0].request.url.query[1].key)
+            .to.equal('b');
+          expect(result.output[0].data.item[0].request.url.query[1].value)
+            .to.equal('{"d":"<string>","deprecated":"<string>"}');
+          expect(result.output[0].data.item[0].request.url.variable[0].value)
+            .to.equal(';limitPath=b,<string>');
+          expect(result.output[0].data.item[0].request.header[0].value)
+            .to.equal('b,<string>');
+        });
+    });
+
+    describe('[Github #643] - Generated value for corresponding' +
+      ' authorization should be as environment variable format', function() {
+
+      it('Should convert a collection and set bearer auth placeholder as variable', function(done) {
+        var openapi = fs.readFileSync(specWithAuthBearer, 'utf8');
+        Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(conversionResult.output[0].type).to.equal('collection');
+          expect(conversionResult.output[0].data).to.have.property('info');
+          expect(conversionResult.output[0].data).to.have.property('item');
+          expect(conversionResult.output[0].data.item.length).to.equal(1);
+          expect(conversionResult.output[0].data.auth.bearer[0].value).to.equal('{{bearerToken}}');
+          done();
+        });
+      });
+
+      it('Should convert a collection and set basic auth placeholder as variable', function(done) {
+        var openapi = fs.readFileSync(specWithAuthBasic, 'utf8');
+        Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(conversionResult.output[0].type).to.equal('collection');
+          expect(conversionResult.output[0].data).to.have.property('info');
+          expect(conversionResult.output[0].data).to.have.property('item');
+          expect(conversionResult.output[0].data.item.length).to.equal(1);
+          expect(conversionResult.output[0].data.auth.basic[0].value).to.equal('{{basicAuthUsername}}');
+          expect(conversionResult.output[0].data.auth.basic[1].value).to.equal('{{basicAuthPassword}}');
+          done();
+        });
+      });
+
+      it('Should convert a collection and set digest auth placeholder as variable', function(done) {
+        var openapi = fs.readFileSync(specWithAuthDigest, 'utf8');
+        Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(conversionResult.output[0].type).to.equal('collection');
+          expect(conversionResult.output[0].data).to.have.property('info');
+          expect(conversionResult.output[0].data).to.have.property('item');
+          expect(conversionResult.output[0].data.item.length).to.equal(1);
+          expect(conversionResult.output[0].data.auth.digest[0].value).to.equal('{{digestAuthUsername}}');
+          expect(conversionResult.output[0].data.auth.digest[1].value).to.equal('{{digestAuthPassword}}');
+          expect(conversionResult.output[0].data.auth.digest[2].value).to.equal('{{realm}}');
+          done();
+        });
+      });
+
+      it('Should convert a collection and set oauth1 auth placeholder as variable', function(done) {
+        var openapi = fs.readFileSync(specWithAuthOauth1, 'utf8');
+        Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(conversionResult.output[0].type).to.equal('collection');
+          expect(conversionResult.output[0].data).to.have.property('info');
+          expect(conversionResult.output[0].data).to.have.property('item');
+          expect(conversionResult.output[0].data.item.length).to.equal(1);
+          expect(conversionResult.output[0].data.auth.oauth1[0].value).to.equal('{{consumerSecret}}');
+          expect(conversionResult.output[0].data.auth.oauth1[1].value).to.equal('{{consumerKey}}');
+          done();
+        });
+      });
+
+      it('Should convert a collection and set apiKey auth placeholder as variable', function(done) {
+        var openapi = fs.readFileSync(specWithAuthApiKey, 'utf8');
+        Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(conversionResult.output[0].type).to.equal('collection');
+          expect(conversionResult.output[0].data).to.have.property('info');
+          expect(conversionResult.output[0].data).to.have.property('item');
+          expect(conversionResult.output[0].data.item.length).to.equal(1);
+          expect(conversionResult.output[0].data.auth.apikey[0].value).to.equal('{{apiKeyName}}');
+          expect(conversionResult.output[0].data.auth.apikey[1].value).to.equal('{{apiKey}}');
+          done();
+        });
+      });
+    });
+
+    it('Should convert and resolve xml bodies correctly when prefix is provided', function(done) {
+      var openapi = fs.readFileSync(xmlRequestAndResponseBody, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const resultantRequestBody = conversionResult.output[0].data.item[0].request.body.raw,
+            resultantResponseBody = conversionResult.output[0].data.item[0].response[0].body,
+            expectedRequestBody = '<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n' +
+              '<ex:ExampleXMLRequest xmlns:ex=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '  <requestNumber>(number)</requestNumber>\n' +
+              '</ex:ExampleXMLRequest>',
+            expectedResponseBody = '<ex:ExampleXMLResponse xmlns:ex=\"urn:ExampleXML\">\n' +
+              '  <responseInteger>(integer)</responseInteger>\n' +
+              '  <responseString>(string)</responseString>\n' +
+              '  <responseBoolean>(boolean)</responseBoolean>\n' +
+              '  <responseNumber>(number)</responseNumber>\n' +
+              '</ex:ExampleXMLResponse>';
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(resultantRequestBody).to.equal(expectedRequestBody);
+          expect(resultantResponseBody).to.equal(expectedResponseBody);
+          done();
+        }
+      );
+    });
+
+    it('Should convert and resolve xml bodies correctly when prefix is not provided', function(done) {
+      var openapi = fs.readFileSync(xmlRequestAndResponseBodyNoPrefix, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const resultantRequestBody = conversionResult.output[0].data.item[0].request.body.raw,
+            resultantResponseBody = conversionResult.output[0].data.item[0].response[0].body,
+            expectedRequestBody = '<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n' +
+              '<ExampleXMLRequest xmlns=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ExampleXMLRequest>',
+            expectedResponseBody = '<ExampleXMLResponse xmlns=\"urn:ExampleXML\">\n' +
+              '  <responseInteger>(integer)</responseInteger>\n' +
+              '  <responseString>(string)</responseString>\n' +
+              '  <responseBoolean>(boolean)</responseBoolean>\n' +
+              '</ExampleXMLResponse>';
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(resultantRequestBody).to.equal(expectedRequestBody);
+          expect(resultantResponseBody).to.equal(expectedResponseBody);
+          done();
+        }
+      );
+    });
+
+    it('Should convert and resolve xml bodies correctly when type is array', function(done) {
+      var openapi = fs.readFileSync(xmlRequestAndResponseBodyArrayType, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const resultantRequestBody = conversionResult.output[0].data.item[0].request.body.raw,
+            resultantResponseBody = conversionResult.output[0].data.item[0].response[0].body,
+            expectedRequestBody = '<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n' +
+              '<ex:ExampleXMLRequest xmlns:ex=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ex:ExampleXMLRequest>\n' +
+              '<ex:ExampleXMLRequest xmlns:ex=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ex:ExampleXMLRequest>',
+            expectedResponseBody = '<ex:ExampleXMLResponse xmlns:ex=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ex:ExampleXMLResponse>\n' +
+              '<ex:ExampleXMLResponse xmlns:ex=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ex:ExampleXMLResponse>';
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(resultantRequestBody).to.equal(expectedRequestBody);
+          expect(resultantResponseBody).to.equal(expectedResponseBody);
+          done();
+        }
+      );
+    });
+
+    it('Should convert and resolve xml bodies correctly when type is array and prefix is not provided', function(done) {
+      var openapi = fs.readFileSync(xmlRequestAndResponseBodyArrayTypeNoPrefix, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const resultantRequestBody = conversionResult.output[0].data.item[0].request.body.raw,
+            resultantResponseBody = conversionResult.output[0].data.item[0].response[0].body,
+            expectedRequestBody = '<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n' +
+              '<ExampleXMLRequest xmlns=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ExampleXMLRequest>\n' +
+              '<ExampleXMLRequest xmlns=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ExampleXMLRequest>',
+            expectedResponseBody = '<ExampleXMLResponse xmlns=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ExampleXMLResponse>\n' +
+              '<ExampleXMLResponse xmlns=\"urn:ExampleXML\">\n' +
+              '  <requestInteger>(integer)</requestInteger>\n' +
+              '  <requestString>(string)</requestString>\n' +
+              '  <requestBoolean>(boolean)</requestBoolean>\n' +
+              '</ExampleXMLResponse>';
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(resultantRequestBody).to.equal(expectedRequestBody);
+          expect(resultantResponseBody).to.equal(expectedResponseBody);
+          done();
+        }
+      );
+    });
+
+    it('Should convert and resolve xml bodies correctly when type is array and xml has wrapped', function(done) {
+      var openapi = fs.readFileSync(xmlRequestAndResponseBodyArrayTypeWrapped, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const resultantRequestBody = conversionResult.output[0].data.item[0].request.body.raw,
+            resultantResponseBody = conversionResult.output[0].data.item[0].response[0].body,
+            expectedRequestBody = '<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n' +
+              '<ex:ExampleXMLRequest>\n' +
+              '  <ex:ExampleXMLRequest xmlns:ex=\"urn:ExampleXML\">\n' +
+              '    <requestInteger>(integer)</requestInteger>\n' +
+              '    <requestString>(string)</requestString>\n' +
+              '    <requestBoolean>(boolean)</requestBoolean>\n' +
+              '  </ex:ExampleXMLRequest>\n' +
+              '  <ex:ExampleXMLRequest xmlns:ex=\"urn:ExampleXML\">\n' +
+              '    <requestInteger>(integer)</requestInteger>\n' +
+              '    <requestString>(string)</requestString>\n' +
+              '    <requestBoolean>(boolean)</requestBoolean>\n' +
+              '  </ex:ExampleXMLRequest>\n' +
+              '</ex:ExampleXMLRequest>',
+            expectedResponseBody = '<ex:ExampleXMLResponse>\n' +
+            '  <ex:ExampleXMLResponse xmlns:ex=\"urn:ExampleXML\">\n' +
+            '    <requestInteger>(integer)</requestInteger>\n' +
+            '    <requestString>(string)</requestString>\n' +
+            '    <requestBoolean>(boolean)</requestBoolean>\n' +
+            '  </ex:ExampleXMLResponse>\n' +
+            '  <ex:ExampleXMLResponse xmlns:ex=\"urn:ExampleXML\">\n' +
+            '    <requestInteger>(integer)</requestInteger>\n' +
+            '    <requestString>(string)</requestString>\n' +
+            '    <requestBoolean>(boolean)</requestBoolean>\n' +
+            '  </ex:ExampleXMLResponse>\n' +
+            '</ex:ExampleXMLResponse>';
+          expect(err).to.be.null;
+          expect(conversionResult.result).to.equal(true);
+          expect(conversionResult.output.length).to.equal(1);
+          expect(resultantRequestBody).to.equal(expectedRequestBody);
+          expect(resultantResponseBody).to.equal(expectedResponseBody);
+          done();
+        }
+      );
+    });
+
+    it('Should fake correctly the body when schema has array type and additionalProperties', function(done) {
+      var openapi = fs.readFileSync(schemaWithArrayTypeAndAdditionalProperties, 'utf8');
+      Converter.convert({ type: 'string', data: openapi }, { schemaFaker: true }, (err, conversionResult) => {
+        const resultantResponseBody = JSON.parse(
+            conversionResult.output[0].data.item[0].response[0].body
+          ),
+          resultantRequestBody = JSON.parse(
+            conversionResult.output[0].data.item[0].request.body.raw
+          );
+        expect(err).to.be.null;
+        expect(conversionResult.result).to.equal(true);
+        expect(conversionResult.output.length).to.equal(1);
+        expect(conversionResult.output[0].type).to.equal('collection');
+        expect(conversionResult.output[0].data).to.have.property('info');
+        expect(conversionResult.output[0].data).to.have.property('item');
+        expect(resultantResponseBody.result).to.be.an('array')
+          .with.length(2);
+        expect(resultantResponseBody.result[0]).to.include.all.keys('id', 'name');
+        expect(resultantResponseBody.result[1]).to.include.all.keys('id', 'name');
+        expect(resultantRequestBody.result).to.be.an('array')
+          .with.length(2);
+        expect(resultantRequestBody.result[0]).to.include.all.keys('id', 'name');
+        expect(resultantRequestBody.result[1]).to.include.all.keys('id', 'name');
+        done();
+      });
+    });
+
+    it('Should resolve correctly schemas with additionalProperties as false', function(done) {
+      var openapi = fs.readFileSync(schemaWithAdditionalProperties, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const requestBodyWithAdditionalPropertiesAsFalse =
+            JSON.parse(conversionResult.output[0].data.item[0].request.body.raw);
+          expect(requestBodyWithAdditionalPropertiesAsFalse).to.include.keys('test');
+          expect(Object.keys(requestBodyWithAdditionalPropertiesAsFalse)).to.have.length(1);
+          done();
+        });
+    });
+
+    it('Should resolve correctly schemas with ONLY additionalProperties', function(done) {
+      var openapi = fs.readFileSync(schemaWithAdditionalProperties, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const responseBodyWithOnlyAdditionalProperties =
+            JSON.parse(conversionResult.output[0].data.item[0].response[0].body);
+          expect(Object.keys(responseBodyWithOnlyAdditionalProperties).length).to.be.greaterThan(0);
+          done();
+        });
+    });
+
+    it('Should resolve correctly schemas with additionalProperties', function(done) {
+      var openapi = fs.readFileSync(schemaWithAdditionalProperties, 'utf8');
+      Converter.convert(
+        { type: 'string', data: openapi },
+        { schemaFaker: true },
+        (err, conversionResult) => {
+          const responseBodyWithAdditionalProperties =
+            JSON.parse(conversionResult.output[0].data.item[0].response[1].body);
+          expect(responseBodyWithAdditionalProperties).to.include.keys('test1');
+
+          // json-schema-faker doesn't guarantee that there will always be additional properties generated
+          expect(Object.keys(responseBodyWithAdditionalProperties).length).to.be.greaterThanOrEqual(1);
+          done();
+        });
+    });
+  });
+
+  describe('Converting swagger 2.0 files', function() {
+    it('should convert path parameters to postman-compatible parameters', function (done) {
+      const fileData = path.join(__dirname, SWAGGER_20_FOLDER_JSON, 'swagger2-with-params.json'),
+        input = {
+          type: 'file',
+          data: fileData
+        };
+
+      Converter.convert(input, {}, function(err, convertResult) {
+        expect(err).to.be.null;
+        // Make sure that path params are updated and their respective default values
+        convertResult.output.forEach(function(element) {
+          expect(element.type).to.equal('collection');
+          expect(element.data.item[0].request.url.path.indexOf(':ownerId') > -1).to.equal(true);
+          expect(element.data.item[0].request.url.path.indexOf(':petId') > -1).to.equal(true);
+
+          let thisVar = element.data.item[0].request.url.variable[0];
+
+          expect(thisVar.type).to.equal('any');
+
+          expect(thisVar.value).to.equal('42');
+          expect(thisVar.key).to.equal('ownerId');
+        });
+        done();
+      });
+    });
+
+    it('Should convert a swagger document with YAML anchors', function(done) {
+      const fileData = fs.readFileSync(path.join(__dirname, SWAGGER_20_FOLDER_YAML, 'yaml_anchor.yaml'), 'utf8'),
+        input = {
+          type: 'string',
+          data: fileData
+        };
+      Converter.convert(input, {}, (error, result) => {
+        expect(error).to.be.null;
+        expect(result.result).to.equal(true);
+        expect(result.output.length).to.equal(1);
+        expect(result.output[0].type).to.have.equal('collection');
+        expect(result.output[0].data).to.have.property('info');
+        expect(result.output[0].data).to.have.property('item');
+      });
+      done();
+    });
+
+    it('must read values consumes', function (done) {
+      const fileData = path.join(__dirname, SWAGGER_20_FOLDER_JSON, 'swagger_aws_2.json'),
+        input = {
+          type: 'file',
+          data: fileData
+        };
+
+      Converter.convert(input, { requestName: 'url' }, (err, convertResult) => {
+        expect(err).to.be.null;
+        // Make sure that consumes and produces are processed
+        convertResult.output.forEach(function(element) {
+          expect(element.type).to.equal('collection');
+          expect(JSON.stringify(element.data.item[0].request.header[0])).to
+            .equal('{"key":"Content-Type","value":"application/json"}');
+        });
+        done();
+      });
+    });
+
+    it('should convert a swagger object which only have a root path.', function(done) {
+      const fileData = JSON.parse(
+          fs.readFileSync(path.join(__dirname, SWAGGER_20_FOLDER_JSON, 'swagger3.json'), 'utf8')
+        ),
+        input = {
+          type: 'json',
+          data: fileData
+        };
+
+      Converter.convert(input, {}, (err, result) => {
+        expect(result.result).to.equal(true);
+        expect(result.output.length).to.equal(1);
+        expect(result.output[0].type).to.have.equal('collection');
+        expect(result.output[0].data).to.have.property('info');
+        expect(result.output[0].data).to.have.property('item');
+
+        done();
+      });
+    });
+
+    it('should name the requests based on requestNameSource parameter, value=`URL`', function (done) {
+      const fileData = path.join(__dirname, SWAGGER_20_FOLDER_JSON, 'swagger3.json'),
+        input = {
+          type: 'file',
+          data: fileData
+        };
+
+      Converter.convert(input, { requestNameSource: 'URL' }, (err, convertResult) => {
+        let request = convertResult.output[0].data.item[0].request;
+
+        expect(err).to.be.null;
+        expect(request.name).to.equal('{{baseUrl}}/');
+        done();
+      });
+    });
+
+    it('should name the requests based on requestNameSource parameter, value=`Fallback`', function (done) {
+      const fileData = path.join(__dirname, SWAGGER_20_FOLDER_JSON, 'swagger3.json'),
+        input = {
+          type: 'file',
+          data: fileData
+        };
+
+      Converter.convert(input, { requestNameSource: 'Fallback' }, (err, convertResult) => {
+        let request = convertResult.output[0].data.item[0].request;
+
+        expect(err).to.be.null;
+        expect(request.name).to.equal('List API versions');
+        done();
+      });
+    });
+
+    it('[GITHUB #10710] - should convert file with all of merging properties. ' +
+      'One ocurrence is an empty object and the other is a boolean type', function() {
+      const fileSource = path.join(__dirname, SWAGGER_20_FOLDER_YAML, 'allOfConflicted.yaml'),
+        fileData = fs.readFileSync(fileSource, 'utf8'),
+        input = {
+          type: 'string',
+          data: fileData
+        };
+
+      Converter.convert(input, { optimizeConversion: false, stackLimit: 50 }, (err, result) => {
+        const expectedResponseBody1 = JSON.parse(
+            result.output[0].data.item[0].item[0].response[0].body
+          ),
+          expectedResponseBody2 = JSON.parse(
+            result.output[0].data.item[0].item[1].response[0].body
+          );
+        expect(err).to.be.null;
+        expect(result.result).to.be.true;
+        expect(expectedResponseBody1.payload).to.be.a('boolean');
+        expect(expectedResponseBody2.payload).to.be.an('object')
+          .and.to.have.all.keys('content', 'paging');
+      });
+    });
   });
 
   describe('requestNameSource option', function() {
@@ -1192,6 +2015,109 @@ describe('INTERFACE FUNCTION TESTS ', function () {
       });
     });
   });
+
+  describe('The converter must identify valid OA3 specification', function () {
+    var pathPrefix = VALID_OPENAPI_PATH,
+      sampleSpecs = fs.readdirSync(path.join(__dirname, pathPrefix)),
+      oa31Files = ['issue#479_2.yaml', 'issue#10229.json', 'query_param_with_enum_resolve_as_example.json'];
+
+    sampleSpecs.map((sample) => {
+      if (!oa31Files.includes(sample)) {
+        var specPath = path.join(__dirname, pathPrefix, sample);
+
+        it(specPath + ' is valid ', function(done) {
+          var openapi = fs.readFileSync(specPath, 'utf8'),
+            validationResult = Converter.validate({ type: 'string', data: openapi });
+
+          expect(validationResult.result).to.equal(true);
+          expect(validationResult.specificationVersion).to.equal('3.0.x');
+          done();
+        });
+      }
+    });
+  });
+
+  describe('The converter must identify valid OA2 specifications - JSON', function () {
+    var pathPrefix = SWAGGER_20_FOLDER_JSON,
+      sampleSpecs = fs.readdirSync(path.join(__dirname, pathPrefix));
+
+    sampleSpecs.map((sample) => {
+      var specPath = path.join(__dirname, pathPrefix, sample);
+
+      it(specPath + ' is valid ', function(done) {
+        var openapi = fs.readFileSync(specPath, 'utf8'),
+          validationResult = Converter.validate({ type: 'string', data: openapi });
+
+        expect(validationResult.result).to.equal(true);
+        expect(validationResult.specificationVersion).to.equal('2.0');
+        done();
+      });
+    });
+  });
+
+  describe('The converter must identify valid OA3.1 specifications - JSON', function () {
+    var pathPrefix = VALID_OPENAPI_3_1_FOLDER_JSON,
+      sampleSpecs = fs.readdirSync(path.join(__dirname, pathPrefix)),
+      oa30Files = ['deprecated_property.json'],
+      incorrectOA31Files = ['webhooks.json'],
+      filesToIgnore = oa30Files + incorrectOA31Files;
+
+
+    sampleSpecs.map((sample) => {
+      if (!filesToIgnore.includes(sample)) {
+        var specPath = path.join(__dirname, pathPrefix, sample);
+
+        it(specPath + ' is valid ', function(done) {
+          var openapi = fs.readFileSync(specPath, 'utf8'),
+            validationResult = Converter.validate({ type: 'string', data: openapi });
+
+          expect(validationResult.result).to.equal(true);
+          expect(validationResult.specificationVersion).to.equal('3.1.x');
+          done();
+        });
+      }
+    });
+  });
+
+  describe('The converter must identify valid OA3.1 specifications - YAML', function () {
+    var pathPrefix = VALID_OPENAPI_3_1_FOLDER_YAML,
+      sampleSpecs = fs.readdirSync(path.join(__dirname, pathPrefix)),
+      invalidOA31Files = ['marketPayNotificationService4.yaml'];
+
+    sampleSpecs.map((sample) => {
+      if (!invalidOA31Files.includes(sample)) {
+        var specPath = path.join(__dirname, pathPrefix, sample);
+
+        it(specPath + ' is valid ', function(done) {
+          var openapi = fs.readFileSync(specPath, 'utf8'),
+            validationResult = Converter.validate({ type: 'string', data: openapi });
+
+          expect(validationResult.result).to.equal(true);
+          expect(validationResult.specificationVersion).to.equal('3.1.x');
+          done();
+        });
+      }
+    });
+  });
+
+  describe('The converter must identify valid OA2 specifications - YAML', function () {
+    var pathPrefix = SWAGGER_20_FOLDER_YAML,
+      sampleSpecs = fs.readdirSync(path.join(__dirname, pathPrefix));
+
+    sampleSpecs.map((sample) => {
+      var specPath = path.join(__dirname, pathPrefix, sample);
+
+      it(specPath + ' is valid ', function(done) {
+        var openapi = fs.readFileSync(specPath, 'utf8'),
+          validationResult = Converter.validate({ type: 'string', data: openapi });
+
+        expect(validationResult.result).to.equal(true);
+        expect(validationResult.specificationVersion).to.equal('2.0');
+        done();
+      });
+    });
+  });
+
   describe('The converter must identify invalid specifications', function () {
     var pathPrefix = INVALID_OPENAPI_PATH,
       sampleSpecs = fs.readdirSync(path.join(__dirname, pathPrefix));

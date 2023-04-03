@@ -27,6 +27,45 @@ describe('parseSpec method', function () {
     expect(parsedSpec.reason).to.equal('Specification must contain an Info Object for the meta-data of the API');
   });
 
+  it('should return false and Spec must contain info object different than null', function () {
+    let fileContent = fs.readFileSync(invalid31xFolder + '/invalid-null-info.json', 'utf8');
+    const parsedSpec = concreteUtils.parseSpec(fileContent, { includeWebhooks: false });
+    expect(parsedSpec.result).to.be.false;
+    expect(parsedSpec.reason).to.equal('Specification must contain an Info Object for the meta-data of the API');
+  });
+
+  it('should return false and Spec must contain information version', function () {
+    let fileContent = fs.readFileSync(invalid31xFolder + '/invalid-info-no-version.json', 'utf8');
+    const parsedSpec = concreteUtils.parseSpec(fileContent, { includeWebhooks: false });
+    expect(parsedSpec.result).to.be.false;
+    expect(parsedSpec.reason)
+      .to.equal('Specification must contain a semantic version number of the API in the Info Object');
+  });
+
+  it('should return false and Spec must contain information version different than null', function () {
+    let fileContent = fs.readFileSync(invalid31xFolder + '/invalid-info-null-version.json', 'utf8');
+    const parsedSpec = concreteUtils.parseSpec(fileContent, { includeWebhooks: false });
+    expect(parsedSpec.result).to.be.false;
+    expect(parsedSpec.reason)
+      .to.equal('Specification must contain a semantic version number of the API in the Info Object');
+  });
+
+  it('should return false and Spec must contain information title', function () {
+    let fileContent = fs.readFileSync(invalid31xFolder + '/invalid-info-no-title.json', 'utf8');
+    const parsedSpec = concreteUtils.parseSpec(fileContent, { includeWebhooks: false });
+    expect(parsedSpec.result).to.be.false;
+    expect(parsedSpec.reason)
+      .to.equal('Specification must contain a title in order to generate a collection');
+  });
+
+  it('should return false and Spec must contain information title different than null', function () {
+    let fileContent = fs.readFileSync(invalid31xFolder + '/invalid-info-null-title.json', 'utf8');
+    const parsedSpec = concreteUtils.parseSpec(fileContent, { includeWebhooks: false });
+    expect(parsedSpec.result).to.be.false;
+    expect(parsedSpec.reason)
+      .to.equal('Specification must contain a title in order to generate a collection');
+  });
+
 });
 
 describe('getRequiredData method', function() {
@@ -585,6 +624,26 @@ describe('fixExamplesByVersion method', function() {
     expect(JSON.stringify(fixedSchemaWithExample)).to.be.equal(JSON.stringify(expectedSchemaAfterFix));
   });
 
+  it('Should correctly handle schema with properties defined as null', function() {
+    const providedSchema = {
+        required: [
+          'id',
+          'name'
+        ],
+        type: 'object',
+        properties: null
+      },
+      expectedSchemaAfterFix = {
+        required: [
+          'id',
+          'name'
+        ],
+        type: 'object',
+        properties: null
+      },
+      fixedSchemaWithExample = concreteUtils.fixExamplesByVersion(providedSchema);
+    expect(JSON.stringify(fixedSchemaWithExample)).to.be.equal(JSON.stringify(expectedSchemaAfterFix));
+  });
 });
 
 describe('isBinaryContentType method', function() {
@@ -611,6 +670,15 @@ describe('isBinaryContentType method', function() {
       },
       isBinary = concreteUtils.isBinaryContentType(bodyType, contentObject);
     expect(isBinary).to.be.false;
+  });
+
+  it('Should correctly handle null value for corresponding body', function() {
+    const bodyType = 'application/octet-stream',
+      contentObject = {
+        'application/octet-stream': null
+      },
+      isBinary = concreteUtils.isBinaryContentType(bodyType, contentObject);
+    expect(isBinary).to.be.true;
   });
 });
 
@@ -663,6 +731,22 @@ describe('getOuterPropsIfIsSupported method', function() {
     expect(resolvedSchema).to.be.an('object')
       .nested.to.have.all.keys('name', 'age', 'job', 'required');
     expect(resolvedSchema.job).to.be.equal(outerProperties.job);
+    expect(JSON.stringify(resolvedSchema.required)).to.be.equal(JSON.stringify(expectedRequiredValue));
+  });
+
+  it('Should correctly handle if outer properties are defined as null', function() {
+    const referencedSchema = {
+        name: 'Test name',
+        age: '30',
+        required: [
+          'name'
+        ]
+      },
+      outerProperties = null,
+      expectedRequiredValue = ['name'],
+      resolvedSchema = concreteUtils.addOuterPropsToRefSchemaIfIsSupported(referencedSchema, outerProperties);
+    expect(resolvedSchema).to.be.an('object')
+      .nested.to.have.all.keys('name', 'age', 'required');
     expect(JSON.stringify(resolvedSchema.required)).to.be.equal(JSON.stringify(expectedRequiredValue));
   });
 });

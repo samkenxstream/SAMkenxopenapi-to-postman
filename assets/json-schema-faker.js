@@ -15,7 +15,8 @@ var _ = require('lodash'),
   {
     handleExclusiveMaximum,
     handleExclusiveMinimum
-  } = require('./../lib/common/schemaUtilsCommon');
+  } = require('./../lib/common/schemaUtilsCommon'),
+  hash = require('object-hash');
 
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
@@ -23467,7 +23468,12 @@ function extend() {
           var context = {};
           while (length--) {
               var fn = keys[length].replace(/^x-/, '');
-              var gen = this.support[fn];
+
+              /**
+               * CHANGE: This Makes sure that we're not using Object's prototype properties,
+               * while accessing certain keys like 'constructor'
+               */
+              var gen = this.support.hasOwnProperty(fn) && this.support[fn];
               if (typeof gen === 'function') {
                 if (typeof schema[fn] === 'object' && schema[fn].hasOwnProperty('type')) {
                   continue;
@@ -23782,7 +23788,7 @@ function extend() {
                   var min = Math.max(params.minimum || 0, 0);
                   var max = Math.min(params.maximum || Infinity, Infinity);
                   min = handleExclusiveMinimum(schema, min);
-                  max = handleExclusiveMaximum(schema, min);
+                  max = handleExclusiveMaximum(schema, max);
                   // discard out-of-bounds enumerations
                   schema.enum = schema.enum.filter(function (x) {
                       if (x >= min && x <= max) {
@@ -23813,6 +23819,14 @@ function extend() {
       }
       // execute generator
       var value = callback(params);
+
+      /**
+       * CHANGE: This Makes sure that we're not typecasting null to "null"
+       */
+      if (_.get(schema, 'nullable') && value === null) {
+        return value;
+      }
+
       // normalize output value
       switch (schema.type) {
           case 'number':
@@ -23829,7 +23843,11 @@ function extend() {
               var min = Math.max(params.minLength || 0, 0);
               var max = Math.min(params.maxLength || Infinity, Infinity);
               while (value.length < min) {
-                  value += ' ' + value;
+                  /**
+                   * CHANGE: This Makes sure that we're not adding extra spaces in generated value,
+                   * As such behaviour generates invalid data when pattern is mentioned.
+                   */
+                  value += (schema.pattern ? '' : ' ') + value;
               }
               if (value.length > max) {
                   value = value.substr(0, max);
@@ -24100,7 +24118,7 @@ function extend() {
   var nullType = nullGenerator;
 
   // TODO provide types
-  function unique(path, items, value, sample, resolve, traverseCallback) {
+  function unique(path, items, value, sample, resolve, traverseCallback, seenSchemaCache) {
       var tmp = [], seen = [];
       function walk(obj) {
           var json = JSON.stringify(obj);
@@ -24113,7 +24131,7 @@ function extend() {
       // TODO: find a better solution?
       var limit = 10;
       while (tmp.length !== items.length) {
-          walk(traverseCallback(value.items || sample, path, resolve));
+          walk(traverseCallback(value.items || sample, path, resolve, null, seenSchemaCache));
           if (!limit--) {
               break;
           }
@@ -24121,7 +24139,7 @@ function extend() {
       return tmp;
   }
   // TODO provide types
-  var arrayType = function arrayType(value, path, resolve, traverseCallback) {
+  var arrayType = function arrayType(value, path, resolve, traverseCallback, seenSchemaCache) {
       var items = [];
       if (!(value.items || value.additionalItems)) {
           if (utils.hasProperties(value, 'minItems', 'maxItems', 'uniqueItems')) {
@@ -24136,7 +24154,7 @@ function extend() {
       if (tmpItems instanceof Array) {
           return Array.prototype.concat.call(items, tmpItems.map(function (item, key) {
               var itemSubpath = path.concat(['items', key + '']);
-              return traverseCallback(item, itemSubpath, resolve);
+              return traverseCallback(item, itemSubpath, resolve, null, seenSchemaCache);
           }));
       }
       var minItems = value.minItems;
@@ -24165,11 +24183,11 @@ function extend() {
       sample = typeof value.additionalItems === 'object' ? value.additionalItems : {};
       for (var current = items.length; current < length; current++) {
           var itemSubpath = path.concat(['items', current + '']);
-          var element = traverseCallback(value.items || sample, itemSubpath, resolve);
+          var element = traverseCallback(value.items || sample, itemSubpath, resolve, null, seenSchemaCache);
           items.push(element);
       }
       if (value.uniqueItems) {
-          return unique(path.concat(['items']), items, value, sample, resolve, traverseCallback);
+          return unique(path.concat(['items']), items, value, sample, resolve, traverseCallback, seenSchemaCache);
       }
       return items;
   };
@@ -24233,14 +24251,14 @@ function extend() {
   var anyType = { type: ['string', 'number', 'integer', 'boolean'] };
   // TODO provide types
   // Updated objectType definition to latest version (0.5.0-rcv.41)
-  var objectType = function objectType(value, path, resolve, traverseCallback) {
+  var objectType = function objectType(value, path, resolve, traverseCallback, seenSchemaCache) {
     const props = {};
-  
+
     const properties = value.properties || {};
     const patternProperties = value.patternProperties || {};
     const requiredProperties = typeof value.required === 'boolean' ? [] : (value.required || []).slice();
     const allowsAdditional = value.additionalProperties !== false;
-  
+
     const propertyKeys = Object.keys(properties);
     const patternPropertyKeys = Object.keys(patternProperties);
     const optionalProperties = propertyKeys.concat(patternPropertyKeys).reduce((_response, _key) => {
@@ -24248,11 +24266,11 @@ function extend() {
       return _response;
     }, []);
     const allProperties = requiredProperties.concat(optionalProperties);
-  
+
     const additionalProperties = allowsAdditional // eslint-disable-line
       ? (value.additionalProperties === true ? anyType : value.additionalProperties)
       : value.additionalProperties;
-  
+
     if (!allowsAdditional
       && propertyKeys.length === 0
       && patternPropertyKeys.length === 0
@@ -24261,28 +24279,28 @@ function extend() {
       // just nothing
       return null;
     }
-  
+
     if (optionAPI('requiredOnly') === true) {
       requiredProperties.forEach(key => {
         if (properties[key]) {
           props[key] = properties[key];
         }
       });
-  
-      return traverseCallback(props, path.concat(['properties']), resolve, value);
+
+      return traverseCallback(props, path.concat(['properties']), resolve, value, seenSchemaCache);
     }
-  
+
     const optionalsProbability = optionAPI('alwaysFakeOptionals') === true ? 1.0 : optionAPI('optionalsProbability');
     const fixedProbabilities = optionAPI('alwaysFakeOptionals') || optionAPI('fixedProbabilities') || false;
     const ignoreProperties = optionAPI('ignoreProperties') || [];
     const reuseProps = optionAPI('reuseProperties');
     const fillProps = optionAPI('fillProperties');
-  
+
     const max = value.maxProperties || (allProperties.length + (allowsAdditional ? random.number(1, 5) : 0));
-  
+
     let min = Math.max(value.minProperties || 0, requiredProperties.length);
     let neededExtras = Math.max(0, allProperties.length - min);
-  
+
     if (optionalsProbability !== null) {
       if (fixedProbabilities === true) {
         neededExtras = Math.round((min - requiredProperties.length) + (optionalsProbability * (allProperties.length - min)));
@@ -24290,21 +24308,21 @@ function extend() {
         neededExtras = random.number(min - requiredProperties.length, optionalsProbability * (allProperties.length - min));
       }
     }
-  
+
     const extraPropertiesRandomOrder = random.shuffle(optionalProperties).slice(0, neededExtras);
     const extraProperties = optionalProperties.filter(_item => {
       return extraPropertiesRandomOrder.indexOf(_item) !== -1;
     });
-  
+
     // properties are read from right-to-left
     const _limit = optionalsProbability !== null || requiredProperties.length === max ? max : random.number(0, max);
     const _props = requiredProperties.concat(extraProperties).slice(0, max);
     const _defns = [];
-  
+
     if (value.dependencies) {
       Object.keys(value.dependencies).forEach(prop => {
         const _required = value.dependencies[prop];
-  
+
         if (_props.indexOf(prop) !== -1) {
           if (Array.isArray(_required)) {
             // property-dependencies
@@ -24318,20 +24336,20 @@ function extend() {
           }
         }
       });
-  
+
       // schema-dependencies
       if (_defns.length) {
         delete value.dependencies;
-  
+
         return traverseCallback({
           allOf: _defns.concat(value),
-        }, path.concat(['properties']), resolve, value);
+        }, path.concat(['properties']), resolve, value, seenSchemaCache);
       }
     }
-  
+
     const skipped = [];
     const missing = [];
-  
+
     _props.forEach(key => {
       for (let i = 0; i < ignoreProperties.length; i += 1) {
         if ((ignoreProperties[i] instanceof RegExp && ignoreProperties[i].test(key))
@@ -24341,24 +24359,24 @@ function extend() {
           return;
         }
       }
-  
+
       if (additionalProperties === false) {
         if (requiredProperties.indexOf(key) !== -1) {
           props[key] = properties[key];
         }
       }
-  
+
       if (properties[key]) {
         props[key] = properties[key];
       }
-  
+
       let found;
-  
+
       // then try patternProperties
       patternPropertyKeys.forEach(_key => {
         if (key.match(new RegExp(_key))) {
           found = true;
-  
+
           if (props[key]) {
             utils.merge(props[key], patternProperties[_key]);
           } else {
@@ -24366,13 +24384,13 @@ function extend() {
           }
         }
       });
-  
+
       if (!found) {
         // try patternProperties again,
         const subschema = patternProperties[key] || additionalProperties;
-  
+
         // FIXME: allow anyType as fallback when no subschema is given?
-  
+
         if (subschema && additionalProperties !== false) {
           // otherwise we can use additionalProperties?
           props[patternProperties[key] ? random.randexp(key) : key] = properties[key] || subschema;
@@ -24381,54 +24399,54 @@ function extend() {
         }
       }
     });
-  
+
     // discard already ignored props if they're not required to be filled...
     let current = Object.keys(props).length + (fillProps ? 0 : skipped.length);
-  
+
     // generate dynamic suffix for additional props...
     const hash = suffix => random.randexp(`_?[_a-f\\d]{1,3}${suffix ? '\\$?' : ''}`);
-  
+
     function get(from) {
       let one;
-  
+
       do {
         if (!from.length) break;
         one = from.shift();
       } while (props[one]);
-  
+
       return one;
     }
-  
+
     let minProps = min;
     if (allowsAdditional && !requiredProperties.length) {
       minProps = Math.max(optionalsProbability === null || additionalProperties ? random.number(fillProps ? 1 : 0, max) : 0, min);
     }
-  
+
     while (fillProps) {
       if (!(patternPropertyKeys.length || allowsAdditional)) {
         break;
       }
-  
+
       if (current >= minProps) {
         break;
       }
-  
+
       if (allowsAdditional) {
         if (reuseProps && ((propertyKeys.length - current) > minProps)) {
           let count = 0;
           let key;
-  
+
           do {
             count += 1;
-  
+
             // skip large objects
             if (count > 1000) {
               break;
             }
-  
+
             key = get(requiredProperties) || random.pick(propertyKeys);
           } while (typeof props[key] !== 'undefined');
-  
+
           if (typeof props[key] === 'undefined') {
             props[key] = properties[key];
             current += 1;
@@ -24436,49 +24454,49 @@ function extend() {
         } else if (patternPropertyKeys.length && !additionalProperties) {
           const prop = random.pick(patternPropertyKeys);
           const word = random.randexp(prop);
-  
+
           if (!props[word]) {
             props[word] = patternProperties[prop];
             current += 1;
           }
         } else {
           const word = get(requiredProperties) || (wordsGenerator(1) + hash());
-  
+
           if (!props[word]) {
             props[word] = additionalProperties || anyType;
             current += 1;
           }
         }
       }
-  
+
       for (let i = 0; current < min && i < patternPropertyKeys.length; i += 1) {
         const _key = patternPropertyKeys[i];
         const word = random.randexp(_key);
-  
-  
+
+
         if (!props[word]) {
           props[word] = patternProperties[_key];
           current += 1;
         }
       }
     }
-  
+
     // fill up-to this value and no more!
     if (requiredProperties.length === 0 && (!allowsAdditional || optionalsProbability === false)) {
       const maximum = random.number(min, max);
-  
+
       for (; current < maximum;) {
         const word = get(propertyKeys);
-  
+
         if (word) {
           props[word] = properties[word];
         }
-  
+
         current += 1;
       }
     }
-  
-    return traverseCallback(props, path.concat(['properties']), resolve, value);
+
+    return traverseCallback(props, path.concat(['properties']), resolve, value, seenSchemaCache);
   };
 
   /**
@@ -24570,7 +24588,11 @@ function extend() {
 
       // types from draft-0[67] (?)
       'uri-reference': `${URI_PATTERN}${PARAM_PATTERN}`,
-      'uri-template': URI_PATTERN.replace('(?:', '(?:/\\{[a-z][:a-zA-Z0-9-]*\\}|'),
+      /**
+       * CHANGE: Corrected uri-template format to be inline with RFC-6570
+       * https://www.rfc-editor.org/rfc/rfc6570#section-2
+       */
+      'uri-template': URI_PATTERN.replace('(?:', '(?:/\\{[a-z][a-zA-Z0-9]*\\}|'),
       'json-pointer': `(/(?:${FRAGMENT.replace(']*', '/]*')}|~[01]))+`,
 
       // some types from https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.1.md#data-types (?)
@@ -24664,31 +24686,42 @@ function extend() {
   };
 
   // TODO provide types
-  function traverse(schema, path, resolve, rootSchema) {
+  function traverse(schema, path, resolve, rootSchema, seenSchemaCache) {
       schema = resolve(schema);
       if (!schema) {
-          return;
+        return;
       }
       if (optionAPI('useExamplesValue') && 'example' in schema) {
         var clonedSchema,
-          result;
+          result,
+          isExampleValid,
+          hashSchema = hash(schema);
 
-        // avoid minItems and maxItems while checking for valid examples
-        if (optionAPI('avoidExampleItemsLength') && _.get(schema, 'type') === 'array') {
-          clonedSchema = _.clone(schema);
-          _.unset(clonedSchema, 'minItems');
-          _.unset(clonedSchema, 'maxItems');
-
-          // avoid validation of values that are in pm variable format (i.e. '{{userId}}')
-          result = validateSchema(clonedSchema, schema.example, { ignoreUnresolvedVariables: true });
+        if(seenSchemaCache && seenSchemaCache.has(hashSchema)) {
+          isExampleValid = seenSchemaCache.get(hashSchema);
         }
         else {
-          // avoid validation of values that are in pm variable format (i.e. '{{userId}}')
-          result = validateSchema(schema, schema.example, { ignoreUnresolvedVariables: true });
+          // avoid minItems and maxItems while checking for valid examples
+          if (optionAPI('avoidExampleItemsLength') && _.get(schema, 'type') === 'array') {
+            clonedSchema = _.clone(schema);
+            _.unset(clonedSchema, 'minItems');
+            _.unset(clonedSchema, 'maxItems');
+
+            // avoid validation of values that are in pm variable format (i.e. '{{userId}}')
+            result = validateSchema(clonedSchema, schema.example, { ignoreUnresolvedVariables: true });
+          }
+          else {
+            // avoid validation of values that are in pm variable format (i.e. '{{userId}}')
+            result = validateSchema(schema, schema.example, { ignoreUnresolvedVariables: true });
+          }
+
+          // Store the final result that needs to be used in the seen map
+          isExampleValid = result && result.length === 0;
+          seenSchemaCache && seenSchemaCache.set(hashSchema, isExampleValid);
         }
 
         // Use example only if valid
-        if (result && result.length === 0) {
+        if (isExampleValid) {
           return schema.example;
         }
       }
@@ -24707,7 +24740,7 @@ function extend() {
       }
       // thunks can return sub-schemas
       if (typeof schema.thunk === 'function') {
-          return traverse(schema.thunk(), path, resolve);
+          return traverse(schema.thunk(), path, resolve, null, seenSchemaCache);
       }
       if (typeof schema.generate === 'function') {
           return utils.typecast(schema, function () { return schema.generate(rootSchema); });
@@ -24735,7 +24768,7 @@ function extend() {
           }
           else {
               try {
-                  var result = typeMap[type](schema, path, resolve, traverse);
+                  var result = typeMap[type](schema, path, resolve, traverse, seenSchemaCache);
                   var required = schema.items
                       ? schema.items.required
                       : schema.required;
@@ -24755,7 +24788,7 @@ function extend() {
       }
       for (var prop in schema) {
           if (typeof schema[prop] === 'object' && prop !== 'definitions') {
-              copy[prop] = traverse(schema[prop], path.concat([prop]), resolve, copy);
+              copy[prop] = traverse(schema[prop], path.concat([prop]), resolve, copy, seenSchemaCache);
           }
           else {
               copy[prop] = schema[prop];
@@ -24825,7 +24858,7 @@ function extend() {
       return obj;
   }
   // TODO provide types
-  function run(refs, schema, container) {
+  function run(refs, schema, container, seenSchemaCache) {
       try {
           var result = traverse(schema, [], function reduce(sub, maxReduceDepth) {
               if (typeof maxReduceDepth === 'undefined') {
@@ -24894,7 +24927,7 @@ function extend() {
                   }
               }
               return container.wrap(sub);
-          });
+          }, null, seenSchemaCache);
           if (optionAPI('resolveJsonPath')) {
               return resolve(result);
           }
@@ -24936,7 +24969,7 @@ function extend() {
           }
       }
   }
-  var jsf = function (schema, refs) {
+  var jsf = function (schema, refs, seenSchemaCache) {
       var ignore = optionAPI('ignoreMissingRefs');
       var $ = deref(function (id, refs) {
           // FIXME: allow custom callback?
@@ -24945,7 +24978,7 @@ function extend() {
           }
       });
       var $refs = getRefs(refs);
-      return run($refs, $(schema, $refs, true), container);
+      return run($refs, $(schema, $refs, true), container, seenSchemaCache);
   };
   jsf.resolve = function (schema, refs, cwd) {
       if (typeof refs === 'string') {

@@ -1,5 +1,79 @@
 # OpenAPI-Postman Changelog
 
+#### v4.10.2 (March 13, 2023)
+* Fixed issue where Accept header was generated correctly in convertV2() interface.
+
+#### v4.10.1 (March 09, 2023)
+* Fixed issue where request name generated were not validated correctly.
+* Fixed test where getOptions() was not using criteria correctly.
+* Fixed issue where deprecated params were reported missing even for includeDeprecated=false
+
+#### v4.10.0 (March 08, 2023)
+* Added support for convertV2() interface which has more stacklimit for schema resolution.
+* Added support for validateTransactionV2() interface uses same v2 interface for resolving schema.
+* Fixed multiple issues for urlencoded body with anyOf and oneOf schemas where valid data was reported as mismatches.
+
+#### v4.9.0 (February 06, 2023)
+* Fixed issue [#660](https://github.com/postmanlabs/openapi-to-postman/issues/660) where for certain XML request bodies, conversion was failing with TypeError.
+* Fixed issue where for some definitions having non-string URLs were failing conversion with TypeErrors.
+* Fixed issue where a test in-consistently kept failing due to uncertainity of jsf library.
+
+#### v4.8.0 (January 24, 2023)
+* Added specifictionVersion field to validate result.
+
+#### v4.7.0 (January 16, 2023)
+* Fixed an issue where same schema was being validated against examples multiple times during a conversion - using local cache here.
+* Added a way to return analytics along with the result for better observability into the kind of schemas we get for conversion.
+* Refactored the resolveRefs and resolveAll to take in an options object as an argument.
+
+#### v4.6.0 (December 30, 2022)
+* Fixed issue where bundling of multi-file definition was not working correctly for more than 10 params correctly.
+* Fixed issue where request name was not using operation description if available.
+
+#### v4.5.0 (December 23, 2022)
+* Fixed issue [#11519](https://github.com/postmanlabs/postman-app-support/issues/11519) Collection generated from imported OpenAPI were missing certain properties.
+* Fixed issue [#11227](https://github.com/postmanlabs/postman-app-support/issues/11227) Collection generated produces incorrect XML requests and responses from Open API 3.0 and Swagger 2.0 API definitions.
+* Fixed issue [#11527](https://github.com/postmanlabs/postman-app-support/issues/11527) where generated collection contained empty body when */* was used as content-type.
+* Fixed issue [#626](https://github.com/postmanlabs/openapi-to-postman/issues/626) - Add a new option (includeDeprecated) to handle deprecated properties (operations, parameters, or schema properties).
+* Fixed issue [#643](https://github.com/postmanlabs/openapi-to-postman/issues/643) Generated value for corresponding authorization should be an environment value.
+* Removed travis workflows as GitHub actions are present now.
+* Updated README.md to include Swagger 2.0 and OpenAPI 3.1 support.
+* Updated README.md to include new postman logo.
+
+#### v4.4.0 (November 29, 2022)
+* Fixed issue where collection folder name for paths were having extra spaces.
+* Fixed issue where pipelines were failing for certain node version.
+
+#### v4.3.0 (October 17, 2022)
+* Fixed issue with nullable keywords getting validated incorrectly.
+
+#### v4.2.0 (August 10, 2022)
+* Improved the way to detect a circular reference by adding a new condition
+* A schema that comes from an allOf parent then we now return the same schema instead of defaulting to a schema with type as object, and no other properties
+* The method resolveAllOf is executed when the current node is an allOf element.
+* Avoiding to set type as object when property's schema is an empty object.
+* Added OAuth2 flows and configuration support.
+* OAuth2 values now default to variables instead of hardcoded strings.
+
+#### v4.1.1 (July 29, 2022)
+* Replaced Object.hasOwnProperty usages with loadsh _.has for safe access.
+
+#### v4.1.0 (July 20, 2022)
+* Fixed issue where conversion was failing for definitions with info object as null.
+* Fixed issue where generated collection did not have correct examples value from XML type of content.
+* Fixed issue [#518](https://github.com/postmanlabs/openapi-to-postman/issues/518) where generated collection were having NaN as value for integer query params with enum values.
+* Fixed issue [#496](https://github.com/postmanlabs/openapi-to-postman/issues/496) where validateTransactions() was returning missing endpoints even though corresponding requests are present in collection.
+* Fixed issue [#478](https://github.com/postmanlabs/openapi-to-postman/issues/478) where updation of path parameter in collection resulted in MISSING_IN_REQUEST error.
+* Fixed issue [#559](https://github.com/postmanlabs/openapi-to-postman/issues/559) where parameter description was undefined for formdata type of content even if defined.
+* Fixed issue where bundle() API didn't handle circular references correctly.
+* Added non-required files to be published as npm module in .npmignore
+* Fixed issue where disableBodyPruning option was not set for requests with no request body.
+
+#### v4.0.0 (July 12, 2022)
+* Added support for new multi-file API detectRootFiles() for OpenAPI 3 and Swagger 2 formats to support detection of root files among multiple files.
+* Added support for new multi-file API detectRelatedFiles() for OpenAPI 3 and Swagger 2 formats to support detection of related files for a provided root file amongst multiple files.
+* Added support for new multi-file API bundle() for OpenAPI 3 and Swagger 2 formats to support bundling of root files from provided multiple files.
+
 #### v3.2.0 (May 02, 2022)
 * Fixed some of critical and high level severity vulnerabilities.
 * Fixed issue [#10752](https://github.com/postmanlabs/postman-app-support/issues/10752) where deepObject style parameters were not generated correctly.
